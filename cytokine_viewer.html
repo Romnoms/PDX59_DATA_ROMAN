@@ -213,6 +213,55 @@
             font-size: 1.2em;
         }
 
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .toggle-label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.95em;
+        }
+
+        .toggle-buttons {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #667eea;
+        }
+
+        .toggle-button {
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+
+        .toggle-button:hover {
+            background: #f0f0ff;
+        }
+
+        .toggle-button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .toggle-button:not(:last-child) {
+            border-right: 2px solid #667eea;
+        }
+
         @media (max-width: 768px) {
             .header {
                 padding: 60px 20px 30px 20px;
@@ -245,10 +294,18 @@
         </div>
 
         <div class="content">
+            <div class="toggle-container">
+                <span class="toggle-label">Data View:</span>
+                <div class="toggle-buttons">
+                    <button class="toggle-button active" onclick="switchDataMode('raw')">Raw (pg/mL)</button>
+                    <button class="toggle-button" onclick="switchDataMode('normalized')">Normalized (Fold Change)</button>
+                </div>
+            </div>
+
             <div class="search-section">
                 <h2>Search for a Cytokine</h2>
                 <div class="search-container">
-                    <input type="text" id="cytokineSearch" placeholder="Type a cytokine name (e.g., IL-6, IL-8, VEGF-A)..." autocomplete="off">
+                    <input type="text" id="cytokineSearch" placeholder="Type a cytokine name or click to see all..." autocomplete="off">
                     <div id="suggestions"></div>
                 </div>
             </div>
@@ -275,6 +332,8 @@
         let cytokineData = {};
         let allCytokines = [];
         let myChart = null;
+        let dataMode = 'raw';  // 'raw' or 'normalized'
+        let currentCytokine = null;  // Track currently displayed cytokine
 
         const colors = {
             'Control': '#6c757d',
@@ -282,6 +341,21 @@
             'SCDi+OA': '#3498db',
             'SCDi+PO': '#2ecc71'
         };
+
+        function switchDataMode(mode) {
+            dataMode = mode;
+
+            // Update button states
+            document.querySelectorAll('.toggle-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Re-plot current cytokine if one is displayed
+            if (currentCytokine) {
+                plotCytokine(currentCytokine);
+            }
+        }
 
         function getSignificance(pValue) {
             if (pValue < 0.001) return '***';
@@ -297,6 +371,7 @@
             }
 
             const data = cytokineData[cytokineName];
+            currentCytokine = cytokineName;  // Track current cytokine
 
             // Show chart section, hide instruction
             document.getElementById('instruction').style.display = 'none';
@@ -313,9 +388,18 @@
                 'SCDi+PO': 'SCDi + PO'
             };
             const labels = treatments.map(t => treatmentLabels[t]);
-            const means = treatments.map(t => data[t].mean);
-            const sems = treatments.map(t => data[t].sem);
+
+            // Select data based on mode
+            const meanKey = dataMode === 'raw' ? 'mean_raw' : 'mean_norm';
+            const semKey = dataMode === 'raw' ? 'sem_raw' : 'sem_norm';
+
+            const means = treatments.map(t => data[t][meanKey]);
+            const sems = treatments.map(t => data[t][semKey]);
             const pValues = treatments.map(t => data[t].pValue);
+
+            // Y-axis label based on mode
+            const yAxisLabel = dataMode === 'raw' ? 'Concentration (pg/mL)' : 'Fold Change (relative to Control)';
+            const valueUnit = dataMode === 'raw' ? ' pg/mL' : '';
 
             // Display stats panel
             const statsHTML = treatments.map(treatment => {
@@ -332,8 +416,8 @@
                 return `
                     <div class="stat-card" style="border-left-color: ${colors[treatment]}">
                         <div class="stat-label">${treatmentLabels[treatment]}</div>
-                        <div class="stat-value">${stats.mean.toFixed(2)} pg/mL</div>
-                        <div class="stat-sem">± ${stats.sem.toFixed(2)} SEM</div>
+                        <div class="stat-value">${stats[meanKey].toFixed(2)}${valueUnit}</div>
+                        <div class="stat-sem">± ${stats[semKey].toFixed(2)} ${dataMode === 'raw' ? 'SEM' : 'FC SEM'}</div>
                         ${pValueHTML}
                     </div>
                 `;
@@ -351,7 +435,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Secreted Cytokine (pg/mL)',
+                        label: yAxisLabel,
                         data: means,
                         backgroundColor: treatments.map(t => colors[t]),
                         borderColor: treatments.map(t => colors[t]),
@@ -381,7 +465,7 @@
                                     const p = pValues[idx];
                                     const pStr = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
                                     return [
-                                        `Mean: ${mean} pg/mL`,
+                                        `Mean: ${mean}${valueUnit}`,
                                         `SEM: ±${sem}`,
                                         pStr
                                     ];
@@ -394,7 +478,7 @@
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Concentration (pg/mL)',
+                                text: yAxisLabel,
                                 font: { size: 14, weight: 'bold' }
                             },
                             grid: {
@@ -445,11 +529,26 @@
         const searchInput = document.getElementById('cytokineSearch');
         const suggestionsDiv = document.getElementById('suggestions');
 
+        // Show all cytokines when clicking/focusing on the search box
+        searchInput.addEventListener('focus', function() {
+            if (this.value.length === 0) {
+                // Show all cytokines when empty
+                suggestionsDiv.innerHTML = allCytokines.map(cytokine =>
+                    `<div class="suggestion-item" onclick="selectCytokine('${cytokine}')">${cytokine}</div>`
+                ).join('');
+                suggestionsDiv.style.display = 'block';
+            }
+        });
+
         searchInput.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
 
             if (searchTerm.length === 0) {
-                suggestionsDiv.style.display = 'none';
+                // Show all cytokines when cleared
+                suggestionsDiv.innerHTML = allCytokines.map(cytokine =>
+                    `<div class="suggestion-item" onclick="selectCytokine('${cytokine}')">${cytokine}</div>`
+                ).join('');
+                suggestionsDiv.style.display = 'block';
                 return;
             }
 

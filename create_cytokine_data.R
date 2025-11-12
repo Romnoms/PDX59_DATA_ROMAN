@@ -97,29 +97,49 @@ for (i in 1:length(cytokine_names)) {
   p_scdi_oa <- welch_t_test(scdi_oa_vals_clean, control_vals_clean)
   p_scdi_po <- welch_t_test(scdi_po_vals_clean, control_vals_clean)
 
+  # Calculate normalized values (fold change relative to control)
+  control_mean <- mean(control_vals_clean, na.rm = TRUE)
+
+  scdi_vals_norm <- if (length(scdi_vals_clean) > 0) scdi_vals_clean / control_mean else numeric(0)
+  scdi_oa_vals_norm <- if (length(scdi_oa_vals_clean) > 0) scdi_oa_vals_clean / control_mean else numeric(0)
+  scdi_po_vals_norm <- if (length(scdi_po_vals_clean) > 0) scdi_po_vals_clean / control_mean else numeric(0)
+  control_vals_norm <- control_vals_clean / control_mean
+
   cytokine_list[[cytokine]] <- list(
     Control = list(
-      mean = mean(control_vals_clean, na.rm = TRUE),
-      sem = calc_sem(control_vals_clean),
-      values = as.list(control_vals_clean),
+      mean_raw = mean(control_vals_clean, na.rm = TRUE),
+      sem_raw = calc_sem(control_vals_clean),
+      values_raw = as.list(control_vals_clean),
+      mean_norm = mean(control_vals_norm, na.rm = TRUE),
+      sem_norm = calc_sem(control_vals_norm),
+      values_norm = as.list(control_vals_norm),
       pValue = 1.0
     ),
     SCDi = list(
-      mean = if (length(scdi_vals_clean) > 0) mean(scdi_vals_clean, na.rm = TRUE) else NA,
-      sem = calc_sem(scdi_vals_clean),
-      values = as.list(scdi_vals_clean),
+      mean_raw = if (length(scdi_vals_clean) > 0) mean(scdi_vals_clean, na.rm = TRUE) else NA,
+      sem_raw = calc_sem(scdi_vals_clean),
+      values_raw = as.list(scdi_vals_clean),
+      mean_norm = if (length(scdi_vals_norm) > 0) mean(scdi_vals_norm, na.rm = TRUE) else NA,
+      sem_norm = calc_sem(scdi_vals_norm),
+      values_norm = as.list(scdi_vals_norm),
       pValue = p_scdi
     ),
     `SCDi+OA` = list(
-      mean = if (length(scdi_oa_vals_clean) > 0) mean(scdi_oa_vals_clean, na.rm = TRUE) else NA,
-      sem = calc_sem(scdi_oa_vals_clean),
-      values = as.list(scdi_oa_vals_clean),
+      mean_raw = if (length(scdi_oa_vals_clean) > 0) mean(scdi_oa_vals_clean, na.rm = TRUE) else NA,
+      sem_raw = calc_sem(scdi_oa_vals_clean),
+      values_raw = as.list(scdi_oa_vals_clean),
+      mean_norm = if (length(scdi_oa_vals_norm) > 0) mean(scdi_oa_vals_norm, na.rm = TRUE) else NA,
+      sem_norm = calc_sem(scdi_oa_vals_norm),
+      values_norm = as.list(scdi_oa_vals_norm),
       pValue = p_scdi_oa
     ),
     `SCDi+PO` = list(
-      mean = if (length(scdi_po_vals_clean) > 0) mean(scdi_po_vals_clean, na.rm = TRUE) else NA,
-      sem = calc_sem(scdi_po_vals_clean),
-      values = as.list(scdi_po_vals_clean),
+      mean_raw = if (length(scdi_po_vals_clean) > 0) mean(scdi_po_vals_clean, na.rm = TRUE) else NA,
+      sem_raw = calc_sem(scdi_po_vals_clean),
+      values_raw = as.list(scdi_po_vals_clean),
+      mean_norm = if (length(scdi_po_vals_norm) > 0) mean(scdi_po_vals_norm, na.rm = TRUE) else NA,
+      sem_norm = calc_sem(scdi_po_vals_norm),
+      values_norm = as.list(scdi_po_vals_norm),
       pValue = p_scdi_po
     )
   )
