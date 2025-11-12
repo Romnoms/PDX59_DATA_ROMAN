@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDX59 Multi-Omics Data Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+
+        .content {
+            padding: 50px 40px;
+        }
+
+        .intro {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .intro h2 {
+            color: #11998e;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+
+        .intro p {
+            color: #6c757d;
+            font-size: 1.1em;
+            line-height: 1.8;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .viewers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .viewer-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+            border: 3px solid transparent;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .viewer-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.2);
+            border-color: #11998e;
+        }
+
+        .viewer-card .icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .viewer-card h3 {
+            color: #11998e;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .viewer-card p {
+            color: #6c757d;
+            font-size: 1em;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .viewer-card .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .viewer-card .stat {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .viewer-card .stat strong {
+            color: #11998e;
+            display: block;
+            font-size: 1.3em;
+            margin-bottom: 3px;
+        }
+
+        .viewer-card .stat span {
+            color: #6c757d;
+            font-size: 0.85em;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #11998e;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+
+        .btn:hover {
+            background: #0e7d70;
+            transform: translateY(-2px);
+        }
+
+        .features {
+            margin-top: 60px;
+            padding: 40px;
+            background: linear-gradient(135deg, rgba(17, 153, 142, 0.05) 0%, rgba(56, 239, 125, 0.05) 100%);
+            border-radius: 15px;
+        }
+
+        .features h3 {
+            color: #11998e;
+            font-size: 1.5em;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .feature-item .feature-icon {
+            font-size: 2em;
+            flex-shrink: 0;
+        }
+
+        .feature-item .feature-text h4 {
+            color: #495057;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .feature-item .feature-text p {
+            color: #6c757d;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #6c757d;
+            font-size: 0.9em;
+            border-top: 2px solid #e9ecef;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .viewers-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .viewer-card {
+                padding: 30px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 PDX59 Multi-Omics Data Visualization</h1>
+            <p>Interactive visualization tools for exploring RNA-seq and proteomic data</p>
+            <span class="badge">✨ Powered by SCD Inhibition Research</span>
+        </div>
+
+        <div class="content">
+            <div class="intro">
+                <h2>Welcome to the Data Explorer</h2>
+                <p>
+                    Explore comprehensive multi-omics datasets from PDX59 glioblastoma cells treated with
+                    SCD inhibitor and fatty acid supplementation. Our interactive tools allow you to visualize
+                    gene expression changes, protein abundance, and perform differential expression analysis
+                    with customizable thresholds.
+                </p>
+            </div>
+
+            <div class="viewers-grid">
+                <a href="gene_viewer.html" class="viewer-card">
+                    <div class="icon">📊</div>
+                    <h3>RNA-seq Gene Expression Viewer</h3>
+                    <p>
+                        Explore transcriptomic changes in response to SCD inhibition with and without
+                        oleic acid or palmitic acid supplementation.
+                    </p>
+                    <div class="stats">
+                        <div class="stat">
+                            <strong>20,814</strong>
+                            <span>Genes</span>
+                        </div>
+                        <div class="stat">
+                            <strong>4</strong>
+                            <span>Conditions</span>
+                        </div>
+                    </div>
+                    <div class="btn">View RNA-seq Data →</div>
+                </a>
+
+                <a href="protein_viewer.html" class="viewer-card">
+                    <div class="icon">🧬</div>
+                    <h3>Proteomic Analysis Viewer</h3>
+                    <p>
+                        Analyze protein abundance changes in cells treated with alkyne-labeled fatty acids
+                        (palmitoleic and palmitic) with or without SCD inhibitor.
+                    </p>
+                    <div class="stats">
+                        <div class="stat">
+                            <strong>2,851</strong>
+                            <span>Proteins</span>
+                        </div>
+                        <div class="stat">
+                            <strong>4</strong>
+                            <span>Conditions</span>
+                        </div>
+                    </div>
+                    <div class="btn">View Proteomic Data →</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>
+                <strong>Experimental Design:</strong> PDX59 cells treated with SCD inhibitor (SCDi) ± fatty acids
+                for 48 hours followed by RNA-seq and proteomic analysis
+            </p>
+        </div>
+    </div>
+</body>
+</html>

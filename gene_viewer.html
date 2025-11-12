@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDX59 Gene Expression Viewer - Fast</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/venn.js@0.2.20/build/venn.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            padding-right: 240px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .back-button:hover {
+            background: rgba(255,255,255,0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 16px;
+            color: #495057;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .search-section {
+            padding: 40px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .search-container {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            font-size: 18px;
+            border: 2px solid #667eea;
+            border-radius: 50px;
+            outline: none;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .search-input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 0 4px rgba(118, 75, 162, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-top: none;
+            border-radius: 0 0 20px 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .suggestion-item:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .suggestion-highlight {
+            font-weight: bold;
+            color: #764ba2;
+        }
+
+        .suggestion-item:hover .suggestion-highlight {
+            color: #ffffff;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .chart-section {
+            padding: 40px;
+            display: none;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-top: 20px;
+        }
+
+        .gene-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .gene-info h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-sem {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .instruction {
+            text-align: center;
+            padding: 60px 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .instruction-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .quick-genes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .quick-gene-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .quick-gene-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .toggle-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+
+        .toggle-label {
+            font-size: 13px;
+            color: #495057;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 45px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #56B4E9;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(21px);
+        }
+
+        .toggle-slider:hover {
+            background-color: #999;
+        }
+
+        input:checked + .toggle-slider:hover {
+            background-color: #3a9ad5;
+        }
+
+        .venn-section {
+            padding: 40px;
+        }
+
+        .venn-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .venn-controls h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .condition-checkboxes {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .threshold-controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .threshold-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .threshold-item label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .threshold-item input[type="number"] {
+            width: 80px;
+            padding: 5px 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .threshold-item select {
+            padding: 5px 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .update-venn-btn {
+            padding: 10px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .update-venn-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        #venn-diagram {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .venn-stats {
+            margin-top: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .venn-stats h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .venn-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .venn-stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .venn-stat-card h4 {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .venn-stat-card .count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        .venn-explanation {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .venn-explanation h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .venn-explanation-section {
+            margin-bottom: 20px;
+        }
+
+        .venn-explanation-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .venn-explanation-section h5 {
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .venn-explanation-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .venn-explanation-section li {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 5px;
+        }
+
+        .venn-explanation-section p {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .gene-list-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .gene-list-modal.active {
+            display: flex;
+        }
+
+        .gene-list-content {
+            background: white;
+            border-radius: 15px;
+            max-width: 800px;
+            max-height: 80vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .gene-list-header {
+            padding: 20px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gene-list-header h3 {
+            margin: 0;
+            color: #495057;
+            font-size: 1.3em;
+        }
+
+        .close-modal-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .close-modal-btn:hover {
+            background: #f8f9fa;
+            color: #495057;
+        }
+
+        .gene-list-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .gene-list-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gene-list-info-text {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .download-genes-btn {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .download-genes-btn:hover {
+            background: #5568d3;
+        }
+
+        .gene-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .gene-item {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            color: #495057;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .gene-item:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .venn-region {
+            cursor: pointer;
+        }
+
+        .venn-region:hover {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 60px 20px 30px 20px;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .back-button {
+                top: 15px;
+                right: 15px;
+                padding: 8px 16px;
+                font-size: 0.85em;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .toggle-container {
+                bottom: 10px;
+                right: 10px;
+                padding: 8px 12px;
+            }
+            .toggle-label {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-button">← Back to home page</a>
+            <h1>🧬 Gene Expression Viewer</h1>
+            <p>PDX59 RNA-seq Analysis - Interactive Visualization</p>
+            <div style="margin-top: 15px; font-size: 0.95em; opacity: 0.95; line-height: 1.6;">
+                <p><strong>Experimental Design:</strong> PDX59 cells treated with SCD inhibitor (SCDi), SCDi + Oleic Acid (OA), SCDi + Palmitic Acid (PA), or vehicle control for 48 hours, followed by RNA extraction and sequencing.</p>
+            </div>
+            <span class="badge">📊 20,814 high-quality genes (filtered: mean ≥ 10)</span>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('gene-viewer')">
+                📊 Gene Viewer
+            </div>
+            <div class="tab" onclick="switchTab('venn-diagram')">
+                🎯 Venn Diagram
+            </div>
+        </div>
+
+        <div id="gene-viewer" class="tab-content active">
+        <div class="search-section">
+            <div class="search-container">
+                <input
+                    type="text"
+                    id="geneSearch"
+                    class="search-input"
+                    placeholder="Search for a gene (e.g., EGFR, TP53, SCD)..."
+                    autocomplete="off"
+                >
+                <span class="search-icon">🔍</span>
+                <div id="suggestions" class="suggestions"></div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading gene expression data...</p>
+        </div>
+
+        <div id="instruction" class="instruction">
+            <div class="instruction-icon">🔍</div>
+            <h2>Start by searching for a gene</h2>
+            <p>Type a gene name in the search bar above to visualize its expression</p>
+            <div class="quick-genes">
+                <button class="quick-gene-btn" onclick="quickPlot('SCD')">SCD</button>
+                <button class="quick-gene-btn" onclick="quickPlot('EGFR')">EGFR</button>
+                <button class="quick-gene-btn" onclick="quickPlot('TP53')">TP53</button>
+                <button class="quick-gene-btn" onclick="quickPlot('MYC')">MYC</button>
+                <button class="quick-gene-btn" onclick="quickPlot('GAPDH')">GAPDH</button>
+                <button class="quick-gene-btn" onclick="quickPlot('ACTB')">ACTB</button>
+            </div>
+        </div>
+
+        <div id="chartSection" class="chart-section">
+            <div class="gene-info">
+                <h2 id="geneName"></h2>
+                <div id="geneStats" class="stats-grid"></div>
+            </div>
+            <div class="chart-container">
+                <canvas id="geneChart"></canvas>
+            </div>
+        </div>
+        </div>
+
+        <div id="venn-diagram-tab" class="tab-content">
+            <div class="venn-section">
+                <div class="venn-controls">
+                    <h3>Select Conditions to Compare</h3>
+                    <div class="condition-checkboxes">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-scdi" value="SCDi" checked>
+                            <label for="venn-scdi">SCDi</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-scdioa" value="SCDi+OA" checked>
+                            <label for="venn-scdioa">SCDi+OA</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-scdipa" value="SCDi+PA" checked>
+                            <label for="venn-scdipa">SCDi+PA</label>
+                        </div>
+                    </div>
+
+                    <h3>Differential Expression Thresholds</h3>
+                    <div class="threshold-controls">
+                        <div class="threshold-item">
+                            <label for="pvalue-threshold">P-value <</label>
+                            <input type="number" id="pvalue-threshold" value="0.05" step="0.01" min="0" max="1">
+                        </div>
+                        <div class="threshold-item">
+                            <label for="fc-threshold">Fold Change</label>
+                            <select id="fc-threshold">
+                                <option value="1.2">1.2x</option>
+                                <option value="1.5" selected>1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                        <div class="threshold-item">
+                            <label for="direction">Direction</label>
+                            <select id="direction">
+                                <option value="both" selected>Up & Down</option>
+                                <option value="up">Up only</option>
+                                <option value="down">Down only</option>
+                            </select>
+                        </div>
+                        <button class="update-venn-btn" onclick="updateVennDiagram()">Update Diagram</button>
+                    </div>
+                </div>
+
+                <div id="venn-diagram"></div>
+
+                <div class="venn-stats" id="venn-stats-section" style="display: none;">
+                    <h3>Differentially Expressed Genes</h3>
+                    <div class="venn-stats-grid" id="venn-stats-grid"></div>
+
+                    <div class="venn-explanation">
+                        <h4>📊 Understanding the Results</h4>
+
+                        <div class="venn-explanation-section">
+                            <h5>Total DEGs per Condition:</h5>
+                            <p>These numbers represent the total genes significantly changed compared to control (p < threshold AND fold change ≥ threshold):</p>
+                            <ul>
+                                <li><strong>SCDi:</strong> Total genes significantly affected by SCD inhibitor alone</li>
+                                <li><strong>SCDi+OA:</strong> Total genes significantly affected by SCD inhibitor + oleic acid</li>
+                                <li><strong>SCDi+PA:</strong> Total genes significantly affected by SCD inhibitor + palmitic acid</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <h5>Unique DEGs ("Only" categories):</h5>
+                            <p>These numbers represent genes affected exclusively by one condition and NOT by the others:</p>
+                            <ul>
+                                <li><strong>SCDi only:</strong> Genes changed by SCDi but NOT by SCDi+OA or SCDi+PA</li>
+                                <li><strong>SCDi+OA only:</strong> Genes changed by SCDi+OA but NOT by the other conditions</li>
+                                <li><strong>SCDi+PA only:</strong> Genes changed by SCDi+PA but NOT by the other conditions</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <h5>Biological Interpretation:</h5>
+                            <ul>
+                                <li><strong>Oleic acid (OA) dramatically rescues SCD inhibition:</strong> Adding OA reduces the transcriptional response, likely because OA is a monounsaturated fatty acid that SCD normally produces</li>
+                                <li><strong>Palmitic acid (PA) provides partial rescue:</strong> The intermediate number of DEGs suggests PA can compensate for some, but not all, effects of SCD inhibition</li>
+                                <li><strong>Core SCD inhibition signature:</strong> Genes unique to SCDi alone represent the specific cellular response to blocking SCD activity</li>
+                                <li><strong>Shared responses:</strong> Genes common across conditions indicate general stress responses or overlapping fatty acid metabolism effects</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <p style="font-style: italic; color: #999;">💡 Tip: Click on any region of the Venn diagram to see the specific genes in that category!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toggle-container">
+        <span class="toggle-label">Include SCDi+PA</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="includePAToggle" checked onchange="handleToggleChange()">
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="gene-list-modal" id="geneListModal">
+        <div class="gene-list-content">
+            <div class="gene-list-header">
+                <h3 id="modalTitle">Genes</h3>
+                <button class="close-modal-btn" onclick="closeGeneListModal()">×</button>
+            </div>
+            <div class="gene-list-body">
+                <div class="gene-list-info">
+                    <span class="gene-list-info-text" id="geneCount">0 genes</span>
+                    <button class="download-genes-btn" onclick="downloadGeneList()">📥 Download</button>
+                </div>
+                <div class="gene-grid" id="geneGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let geneData = {};
+        let allGenes = [];
+        let chart = null;
+
+        const colors = {
+            'Ctrl': '#999999',
+            'SCDi': '#E69F00',
+            'SCDi+PA': '#56B4E9',
+            'SCDi+OA': '#009E73'
+        };
+
+        let degSets = {}; // Store differentially expressed gene sets
+
+        // Tab switching function
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            if (tabName === 'gene-viewer') {
+                document.getElementById('gene-viewer').classList.add('active');
+                document.querySelectorAll('.tab')[0].classList.add('active');
+            } else if (tabName === 'venn-diagram') {
+                document.getElementById('venn-diagram-tab').classList.add('active');
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                // Generate Venn diagram when first opened if not already generated
+                if (Object.keys(degSets).length === 0) {
+                    calculateDEGs();
+                    updateVennDiagram();
+                }
+            }
+        }
+
+        // Calculate differentially expressed genes
+        function calculateDEGs() {
+            const pThreshold = parseFloat(document.getElementById('pvalue-threshold').value) || 0.05;
+            const fcThreshold = parseFloat(document.getElementById('fc-threshold').value) || 1.5;
+            const direction = document.getElementById('direction').value;
+
+            degSets = {
+                'SCDi': new Set(),
+                'SCDi+OA': new Set(),
+                'SCDi+PA': new Set()
+            };
+
+            // For each gene, check if it's differentially expressed in each condition
+            Object.keys(geneData).forEach(gene => {
+                const data = geneData[gene];
+                const ctrlValues = data['Ctrl'].values;
+
+                ['SCDi', 'SCDi+OA', 'SCDi+PA'].forEach(treatment => {
+                    const treatmentValues = data[treatment].values;
+                    const pValue = tTest(treatmentValues, ctrlValues);
+                    const meanTreatment = data[treatment].mean;
+                    const meanCtrl = data['Ctrl'].mean;
+                    const foldChange = meanTreatment / meanCtrl;
+
+                    let isDEG = false;
+                    if (pValue < pThreshold) {
+                        if (direction === 'both') {
+                            isDEG = (foldChange >= fcThreshold || foldChange <= 1/fcThreshold);
+                        } else if (direction === 'up') {
+                            isDEG = (foldChange >= fcThreshold);
+                        } else if (direction === 'down') {
+                            isDEG = (foldChange <= 1/fcThreshold);
+                        }
+                    }
+
+                    if (isDEG) {
+                        degSets[treatment].add(gene);
+                    }
+                });
+            });
+
+            console.log('DEG counts:', {
+                'SCDi': degSets['SCDi'].size,
+                'SCDi+OA': degSets['SCDi+OA'].size,
+                'SCDi+PA': degSets['SCDi+PA'].size
+            });
+        }
+
+        // Update Venn diagram based on selected conditions
+        function updateVennDiagram() {
+            calculateDEGs();
+
+            // Get selected conditions
+            const selectedConditions = [];
+            if (document.getElementById('venn-scdi').checked) selectedConditions.push('SCDi');
+            if (document.getElementById('venn-scdioa').checked) selectedConditions.push('SCDi+OA');
+            if (document.getElementById('venn-scdipa').checked) selectedConditions.push('SCDi+PA');
+
+            if (selectedConditions.length === 0) {
+                document.getElementById('venn-diagram').innerHTML = '<p style="text-align: center; color: #6c757d; padding: 50px;">Please select at least one condition to display.</p>';
+                document.getElementById('venn-stats-section').style.display = 'none';
+                return;
+            }
+
+            // Prepare data for venn.js
+            const vennData = prepareVennData(selectedConditions);
+
+            // Clear previous diagram
+            document.getElementById('venn-diagram').innerHTML = '';
+
+            // Draw Venn diagram
+            const chart = venn.VennDiagram()
+                .width(800)
+                .height(500);
+
+            const div = d3.select("#venn-diagram").datum(vennData).call(chart);
+
+            // Style the diagram
+            div.selectAll("text").style("fill", "white").style("font-weight", "600");
+            div.selectAll(".venn-circle path")
+                .style("fill-opacity", 0.3)
+                .style("stroke-width", 2)
+                .style("stroke-opacity", 1);
+
+            // Color the circles
+            div.selectAll(".venn-circle")
+                .each(function(d, i) {
+                    const colorMap = {
+                        'SCDi': '#E69F00',
+                        'SCDi+OA': '#009E73',
+                        'SCDi+PA': '#56B4E9'
+                    };
+                    d3.select(this).select("path")
+                        .style("fill", colorMap[d.sets[0]] || '#667eea')
+                        .style("stroke", colorMap[d.sets[0]] || '#667eea');
+                });
+
+            // Add click handlers and tooltips
+            div.selectAll("g")
+                .style("cursor", "pointer")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).select("path")
+                        .style("fill-opacity", 0.5);
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this).select("path")
+                        .style("fill-opacity", 0.3);
+                })
+                .on("click", function(event, d) {
+                    event.stopPropagation();
+                    showGenesForRegion(d.sets);
+                });
+
+            // Update stats
+            updateVennStats(selectedConditions);
+        }
+
+        // Prepare data for Venn diagram
+        function prepareVennData(selectedConditions) {
+            const data = [];
+
+            // Single sets
+            selectedConditions.forEach(condition => {
+                data.push({
+                    sets: [condition],
+                    size: degSets[condition].size
+                });
+            });
+
+            // Pairwise intersections
+            if (selectedConditions.length >= 2) {
+                for (let i = 0; i < selectedConditions.length; i++) {
+                    for (let j = i + 1; j < selectedConditions.length; j++) {
+                        const cond1 = selectedConditions[i];
+                        const cond2 = selectedConditions[j];
+                        const intersection = new Set([...degSets[cond1]].filter(x => degSets[cond2].has(x)));
+                        data.push({
+                            sets: [cond1, cond2],
+                            size: intersection.size
+                        });
+                    }
+                }
+            }
+
+            // Triple intersection
+            if (selectedConditions.length === 3) {
+                const [cond1, cond2, cond3] = selectedConditions;
+                const intersection = new Set(
+                    [...degSets[cond1]].filter(x =>
+                        degSets[cond2].has(x) && degSets[cond3].has(x)
+                    )
+                );
+                data.push({
+                    sets: [cond1, cond2, cond3],
+                    size: intersection.size
+                });
+            }
+
+            return data;
+        }
+
+        // Update statistics display
+        function updateVennStats(selectedConditions) {
+            const statsGrid = document.getElementById('venn-stats-grid');
+            statsGrid.innerHTML = '';
+
+            selectedConditions.forEach(condition => {
+                const card = document.createElement('div');
+                card.className = 'venn-stat-card';
+                card.innerHTML = `
+                    <h4>${condition}</h4>
+                    <div class="count">${degSets[condition].size}</div>
+                `;
+                statsGrid.appendChild(card);
+            });
+
+            // Show unique genes in each condition
+            if (selectedConditions.length >= 2) {
+                selectedConditions.forEach(condition => {
+                    const uniqueGenes = new Set([...degSets[condition]]);
+                    selectedConditions.forEach(otherCondition => {
+                        if (condition !== otherCondition) {
+                            [...degSets[otherCondition]].forEach(gene => uniqueGenes.delete(gene));
+                        }
+                    });
+
+                    const card = document.createElement('div');
+                    card.className = 'venn-stat-card';
+                    card.style.borderLeftColor = colors[condition];
+                    card.innerHTML = `
+                        <h4>${condition} only</h4>
+                        <div class="count">${uniqueGenes.size}</div>
+                    `;
+                    statsGrid.appendChild(card);
+                });
+            }
+
+            document.getElementById('venn-stats-section').style.display = 'block';
+        }
+
+        // Show genes for a clicked Venn diagram region
+        function showGenesForRegion(sets) {
+            // Calculate which genes are in this region
+            let genes;
+            if (sets.length === 1) {
+                // Single condition - show all DEGs for that condition
+                genes = Array.from(degSets[sets[0]]);
+            } else if (sets.length === 2) {
+                // Two conditions - show intersection
+                genes = Array.from(degSets[sets[0]]).filter(g => degSets[sets[1]].has(g));
+            } else if (sets.length === 3) {
+                // Three conditions - show triple intersection
+                genes = Array.from(degSets[sets[0]]).filter(g =>
+                    degSets[sets[1]].has(g) && degSets[sets[2]].has(g)
+                );
+            }
+
+            // Sort genes alphabetically
+            genes.sort();
+
+            // Update modal title and count
+            document.getElementById('modalTitle').textContent =
+                sets.length === 1 ? `${sets[0]} DEGs` : `${sets.join(' ∩ ')} Overlap`;
+            document.getElementById('geneCount').textContent = `${genes.length} genes`;
+
+            // Populate gene grid
+            const geneGrid = document.getElementById('geneGrid');
+            geneGrid.innerHTML = genes.map(gene =>
+                `<div class="gene-item" onclick="viewGeneInViewer('${gene}')">${gene}</div>`
+            ).join('');
+
+            // Store current gene list for download
+            window.currentGeneList = genes;
+            window.currentRegionName = sets.join('_');
+
+            // Show modal
+            document.getElementById('geneListModal').classList.add('active');
+        }
+
+        // Close gene list modal
+        function closeGeneListModal() {
+            document.getElementById('geneListModal').classList.remove('active');
+        }
+
+        // Download gene list as text file
+        function downloadGeneList() {
+            if (!window.currentGeneList || window.currentGeneList.length === 0) return;
+
+            const content = window.currentGeneList.join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `DEGs_${window.currentRegionName}_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // View a gene in the Gene Viewer tab
+        function viewGeneInViewer(geneName) {
+            closeGeneListModal();
+            switchTab('gene-viewer');
+            document.getElementById('geneSearch').value = geneName;
+            plotGene(geneName);
+        }
+
+        // Load data - JSON is MUCH faster than CSV parsing
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('instruction').style.display = 'none';
+
+        fetch('gene_data_optimized.json')
+            .then(response => response.json())
+            .then(data => {
+                geneData = data;
+                allGenes = Object.keys(data).sort();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('instruction').style.display = 'block';
+
+                console.log(`✅ Loaded ${allGenes.length} genes instantly!`);
+            })
+            .catch(error => {
+                document.getElementById('loading').innerHTML =
+                    '<div style="color: #c33; padding: 20px;">Error loading data: ' + error.message + '</div>';
+            });
+
+        // Search functionality
+        const searchInput = document.getElementById('geneSearch');
+        const suggestionsDiv = document.getElementById('suggestions');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toUpperCase();
+
+            if (query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            // Binary search for faster lookups + filter
+            const matches = allGenes
+                .filter(gene => gene.toUpperCase().includes(query))
+                .slice(0, 20);
+
+            if (matches.length > 0) {
+                suggestionsDiv.innerHTML = matches.map(gene => {
+                    const idx = gene.toUpperCase().indexOf(query);
+                    const before = gene.substring(0, idx);
+                    const match = gene.substring(idx, idx + query.length);
+                    const after = gene.substring(idx + query.length);
+
+                    return `<div class="suggestion-item" data-gene="${gene}">
+                        ${before}<span class="suggestion-highlight">${match}</span>${after}
+                    </div>`;
+                }).join('');
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        suggestionsDiv.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item') || e.target.parentElement.classList.contains('suggestion-item')) {
+                const item = e.target.classList.contains('suggestion-item') ? e.target : e.target.parentElement;
+                const gene = item.dataset.gene;
+                searchInput.value = gene;
+                suggestionsDiv.style.display = 'none';
+                plotGene(gene);
+            }
+        });
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const gene = this.value.trim().toUpperCase();
+                if (allGenes.includes(gene)) {
+                    suggestionsDiv.style.display = 'none';
+                    plotGene(gene);
+                } else {
+                    // Try case-insensitive match
+                    const match = allGenes.find(g => g.toUpperCase() === gene);
+                    if (match) {
+                        suggestionsDiv.style.display = 'none';
+                        plotGene(match);
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        function quickPlot(geneName) {
+            searchInput.value = geneName;
+            plotGene(geneName);
+        }
+
+        // T-test function for calculating p-values
+        function tTest(array1, array2) {
+            const n1 = array1.length;
+            const n2 = array2.length;
+
+            const mean1 = array1.reduce((a, b) => a + b, 0) / n1;
+            const mean2 = array2.reduce((a, b) => a + b, 0) / n2;
+
+            const variance1 = array1.reduce((a, b) => a + Math.pow(b - mean1, 2), 0) / (n1 - 1);
+            const variance2 = array2.reduce((a, b) => a + Math.pow(b - mean2, 2), 0) / (n2 - 1);
+
+            // Welch's t-test (unequal variances)
+            const t = (mean1 - mean2) / Math.sqrt(variance1/n1 + variance2/n2);
+            const df = Math.pow(variance1/n1 + variance2/n2, 2) /
+                      (Math.pow(variance1/n1, 2)/(n1-1) + Math.pow(variance2/n2, 2)/(n2-1));
+
+            // Approximate p-value using Student's t-distribution
+            const p = 2 * (1 - studentT(Math.abs(t), df));
+
+            return p;
+        }
+
+        // Cumulative distribution function for Student's t-distribution
+        function studentT(t, df) {
+            const x = df / (df + t * t);
+            return 1 - 0.5 * incompleteBeta(x, df/2, 0.5);
+        }
+
+        // Incomplete beta function (approximation)
+        function incompleteBeta(x, a, b) {
+            if (x <= 0) return 0;
+            if (x >= 1) return 1;
+
+            const bt = Math.exp(
+                a * Math.log(x) + b * Math.log(1 - x) -
+                (logGamma(a) + logGamma(b) - logGamma(a + b))
+            );
+
+            if (x < (a + 1) / (a + b + 2)) {
+                return bt * betaCF(x, a, b) / a;
+            } else {
+                return 1 - bt * betaCF(1 - x, b, a) / b;
+            }
+        }
+
+        // Continued fraction for incomplete beta
+        function betaCF(x, a, b) {
+            const maxIter = 100;
+            const epsilon = 1e-10;
+            let am = 1;
+            let bm = 1;
+            let az = 1;
+            const qab = a + b;
+            const qap = a + 1;
+            const qam = a - 1;
+            let bz = 1 - qab * x / qap;
+
+            for (let m = 1; m <= maxIter; m++) {
+                const em = m;
+                const tem = em + em;
+                let d = em * (b - m) * x / ((qam + tem) * (a + tem));
+                let ap = az + d * am;
+                let bp = bz + d * bm;
+                d = -(a + em) * (qab + em) * x / ((a + tem) * (qap + tem));
+                const app = ap + d * az;
+                const bpp = bp + d * bz;
+                const aold = az;
+                am = ap / bpp;
+                bm = bp / bpp;
+                az = app / bpp;
+                bz = 1;
+
+                if (Math.abs(az - aold) < epsilon * Math.abs(az)) {
+                    return az;
+                }
+            }
+            return az;
+        }
+
+        // Log gamma function
+        function logGamma(x) {
+            const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+                        -1.231739572450155, 0.001208650973866179, -0.000005395239384953];
+            let y = x;
+            let tmp = x + 5.5;
+            tmp -= (x + 0.5) * Math.log(tmp);
+            let ser = 1.000000000190015;
+            for (let j = 0; j < 6; j++) {
+                ser += cof[j] / ++y;
+            }
+            return -tmp + Math.log(2.5066282746310005 * ser / x);
+        }
+
+        // Get significance stars
+        function getSignificance(pValue) {
+            if (pValue < 0.001) return '***';
+            if (pValue < 0.01) return '**';
+            if (pValue < 0.05) return '*';
+            return 'ns';
+        }
+
+        function handleToggleChange() {
+            const geneName = document.getElementById('geneName').textContent;
+            if (geneName && geneData[geneName]) {
+                plotGene(geneName);
+            }
+        }
+
+        function plotGene(geneName) {
+            if (!geneData[geneName]) {
+                alert('Gene not found: ' + geneName);
+                return;
+            }
+
+            const data = geneData[geneName];
+            const includePA = document.getElementById('includePAToggle').checked;
+            const treatments = includePA ?
+                ['Ctrl', 'SCDi', 'SCDi+OA', 'SCDi+PA'] :
+                ['Ctrl', 'SCDi', 'SCDi+OA'];
+
+            // Check for invalid data
+            const hasInvalidData = treatments.some(t => {
+                const values = data[t].values;
+                return values.some(v => typeof v !== 'number' || isNaN(v) || !isFinite(v));
+            });
+
+            if (hasInvalidData) {
+                alert(`Gene ${geneName} contains invalid data (NaN or Infinity). Please try another gene.`);
+                return;
+            }
+
+            // Show chart section
+            document.getElementById('instruction').style.display = 'none';
+            document.getElementById('chartSection').style.display = 'block';
+            document.getElementById('geneName').textContent = geneName;
+
+            // Calculate p-values vs control
+            const ctrlValues = data['Ctrl'].values;
+            const pValues = {};
+            treatments.forEach(treatment => {
+                if (treatment !== 'Ctrl') {
+                    pValues[treatment] = tTest(data[treatment].values, ctrlValues);
+                }
+            });
+
+            // Display stats with p-values
+            const statsHTML = treatments.map(treatment => {
+                const stats = data[treatment];
+                let pValueHTML = '';
+
+                if (treatment !== 'Ctrl') {
+                    const p = pValues[treatment];
+                    const sig = getSignificance(p);
+                    const pDisplay = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
+                    pValueHTML = `<div class="stat-sem" style="color: ${p < 0.05 ? '#c33' : '#999'}; font-weight: ${p < 0.05 ? 'bold' : 'normal'}">${pDisplay} ${sig}</div>`;
+                }
+
+                return `
+                    <div class="stat-card" style="border-left-color: ${colors[treatment]}">
+                        <div class="stat-label">${treatment}</div>
+                        <div class="stat-value">${stats.mean.toFixed(3)}</div>
+                        <div class="stat-sem">± ${stats.sem.toFixed(3)} SEM</div>
+                        ${pValueHTML}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('geneStats').innerHTML = statsHTML;
+
+            // Prepare chart data
+            const chartData = {
+                labels: treatments,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Mean ± SEM',
+                        data: treatments.map(t => data[t].mean),
+                        backgroundColor: treatments.map(t => colors[t] + 'CC'),
+                        borderColor: treatments.map(t => colors[t]),
+                        borderWidth: 2
+                    }
+                ]
+            };
+
+            // Create or update chart
+            const ctx = document.getElementById('geneChart');
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${geneName} - Expression Normalized to Control`,
+                            font: { size: 18, weight: 'bold' }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Normalized Expression: ${context.parsed.y.toFixed(4)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Normalized Expression (Relative to Control)',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Treatment',
+                                font: { size: 14, weight: 'bold' }
+                            }
+                        }
+                    },
+                    animation: {
+                        onComplete: drawErrorBarsAndReferenceLine
+                    }
+                }
+            });
+
+            // Scroll to chart
+            document.getElementById('chartSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function drawErrorBarsAndReferenceLine() {
+            const chartInstance = this;
+            const ctx = chartInstance.ctx;
+            const xAxis = chartInstance.scales.x;
+            const yAxis = chartInstance.scales.y;
+            const geneName = document.getElementById('geneName').textContent;
+            const data = geneData[geneName];
+            const treatments = ['Ctrl', 'SCDi', 'SCDi+OA', 'SCDi+PA'];
+
+            // Calculate p-values
+            const ctrlValues = data['Ctrl'].values;
+            const pValues = {};
+            treatments.forEach(treatment => {
+                if (treatment !== 'Ctrl') {
+                    pValues[treatment] = tTest(data[treatment].values, ctrlValues);
+                }
+            });
+
+            // Draw error bars and p-value annotations
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+
+            treatments.forEach((treatment, idx) => {
+                const x = xAxis.getPixelForValue(idx);
+                const mean = data[treatment].mean;
+                const sem = data[treatment].sem;
+                const yTop = yAxis.getPixelForValue(mean + sem);
+                const yBottom = yAxis.getPixelForValue(mean - sem);
+
+                // Error bar vertical line
+                ctx.beginPath();
+                ctx.moveTo(x, yTop);
+                ctx.lineTo(x, yBottom);
+                ctx.stroke();
+
+                // Top cap
+                ctx.beginPath();
+                ctx.moveTo(x - 10, yTop);
+                ctx.lineTo(x + 10, yTop);
+                ctx.stroke();
+
+                // Bottom cap
+                ctx.beginPath();
+                ctx.moveTo(x - 10, yBottom);
+                ctx.lineTo(x + 10, yBottom);
+                ctx.stroke();
+
+                // Add significance stars above bars (not for Ctrl)
+                if (treatment !== 'Ctrl') {
+                    const p = pValues[treatment];
+                    const sig = getSignificance(p);
+
+                    if (sig !== 'ns') {
+                        ctx.font = 'bold 16px Arial';
+                        ctx.fillStyle = p < 0.001 ? '#c00' : p < 0.01 ? '#e60' : '#f90';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(sig, x, yTop - 5);
+                    }
+                }
+            });
+
+            // Draw reference line at y=1
+            const y1 = yAxis.getPixelForValue(1);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(xAxis.left, y1);
+            ctx.lineTo(xAxis.right, y1);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    </script>
+</body>
+</html>

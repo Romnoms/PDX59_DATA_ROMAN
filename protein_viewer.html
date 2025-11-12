@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proteomic Analysis - Interactive Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/venn.js@0.2.20/build/venn.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 40px;
+            padding-right: 240px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .back-button:hover {
+            background: rgba(255,255,255,0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 16px;
+            color: #495057;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+            color: #11998e;
+        }
+
+        .tab.active {
+            color: #11998e;
+            border-bottom-color: #11998e;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .search-section {
+            padding: 40px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .search-section h2 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .search-container {
+            position: relative;
+            max-width: 600px;
+        }
+
+        #proteinSearch {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        #proteinSearch:focus {
+            border-color: #11998e;
+            box-shadow: 0 0 0 3px rgba(17, 153, 142, 0.1);
+        }
+
+        #suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #11998e;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: 'Courier New', monospace;
+        }
+
+        .suggestion-item:hover {
+            background: #f8f9fa;
+        }
+
+        .suggestion-highlight {
+            background: #fff3cd;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            padding: 40px;
+            background: white;
+        }
+
+        .chart-wrapper {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        #instruction {
+            text-align: center;
+            color: #6c757d;
+            padding: 60px 20px;
+            font-size: 1.2em;
+        }
+
+        #loading {
+            text-align: center;
+            color: #6c757d;
+            padding: 60px 20px;
+            font-size: 1.2em;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #11998e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .protein-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .protein-info h2 {
+            color: #11998e;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #11998e;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .stat-sem {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .chart-section {
+            display: none;
+            padding: 40px;
+            background: white;
+        }
+
+        .venn-section {
+            padding: 40px;
+        }
+
+        .venn-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .venn-controls h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .condition-checkboxes {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 15px;
+            color: #495057;
+        }
+
+        .threshold-controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .threshold-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .threshold-item label {
+            font-size: 13px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .threshold-item input,
+        .threshold-item select {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .update-venn-btn {
+            padding: 10px 24px;
+            background: #11998e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .update-venn-btn:hover {
+            background: #0e7d70;
+            transform: translateY(-2px);
+        }
+
+        #venn-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 500px;
+            background: white;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .venn-stats {
+            margin-top: 30px;
+        }
+
+        .venn-stats h3 {
+            color: #495057;
+            margin-bottom: 20px;
+        }
+
+        .venn-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .venn-stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #11998e;
+        }
+
+        .venn-stat-card h4 {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 8px;
+        }
+
+        .venn-stat-card .count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        .venn-explanation {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 4px solid #11998e;
+        }
+
+        .venn-explanation h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .venn-explanation-section {
+            margin-bottom: 20px;
+        }
+
+        .venn-explanation-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .venn-explanation-section h5 {
+            color: #11998e;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .venn-explanation-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .venn-explanation-section li {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 5px;
+        }
+
+        .venn-explanation-section p {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .gene-list-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .gene-list-modal.active {
+            display: flex;
+        }
+
+        .gene-list-content {
+            background: white;
+            border-radius: 15px;
+            max-width: 900px;
+            max-height: 80vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .gene-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            border-bottom: 2px solid #e9ecef;
+            background: #f8f9fa;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .gene-list-header h3 {
+            margin: 0;
+            color: #495057;
+            font-size: 20px;
+        }
+
+        .close-modal-btn {
+            background: none;
+            border: none;
+            font-size: 32px;
+            line-height: 1;
+            cursor: pointer;
+            color: #6c757d;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+
+        .close-modal-btn:hover {
+            background: #f8f9fa;
+            color: #495057;
+        }
+
+        .gene-list-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .gene-list-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gene-list-info-text {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .download-genes-btn {
+            padding: 8px 15px;
+            background: #11998e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .download-genes-btn:hover {
+            background: #0e7d70;
+        }
+
+        .gene-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .gene-item {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            color: #495057;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .gene-item:hover {
+            background: #11998e;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 60px 20px 30px 20px;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .back-button {
+                top: 15px;
+                right: 15px;
+                padding: 8px 16px;
+                font-size: 0.85em;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-button">← Back to home page</a>
+            <h1>🧬 Proteomic Analysis - Interactive Visualization</h1>
+            <p>Explore protein abundance changes in response to alkyne-labeled fatty acids ± SCD inhibition</p>
+            <span class="badge">📊 2,851 high-quality proteins (filtered: intensity ≥ 200K)</span>
+            <div style="margin-top: 15px; font-size: 0.95em; opacity: 0.95; line-height: 1.6;">
+                <p><strong>Experimental Design:</strong> Cells treated with DMSO (control), alkyne-palmitoleic acid (16:1), alkyne-palmitic acid (16:0), or alkyne-palmitic acid + SCD inhibitor (CAY10056) followed by proteomics analysis.</p>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('protein-viewer')">
+                📊 Protein Viewer
+            </div>
+            <div class="tab" onclick="switchTab('venn-diagram')">
+                🎯 Venn Diagram
+            </div>
+        </div>
+
+        <div id="protein-viewer-tab" class="tab-content active">
+            <div class="search-section">
+                <h2>Search for a Protein</h2>
+                <div class="search-container">
+                    <input type="text" id="proteinSearch" placeholder="Type a protein name (e.g., CD44, PTGFRN, ACTBL2)..." autocomplete="off">
+                    <div id="suggestions"></div>
+                </div>
+            </div>
+
+            <div id="chartSection" class="chart-section">
+                <div class="protein-info">
+                    <h2 id="proteinName"></h2>
+                    <div id="proteinStats" class="stats-grid"></div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="proteinChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div id="loading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Loading protein data...</p>
+                </div>
+                <div id="instruction">
+                    👆 Search for a protein above to visualize its abundance changes
+                </div>
+            </div>
+        </div>
+
+        <div id="venn-diagram-tab" class="tab-content">
+            <div class="venn-section">
+                <div class="venn-controls">
+                    <h3>Select Conditions to Compare</h3>
+                    <div class="condition-checkboxes">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-alk-palmitoleic" value="Alk_Palmitoleic" checked>
+                            <label for="venn-alk-palmitoleic">Alk-Palmitoleic</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-alk-palmitic" value="Alk_Palmitic" checked>
+                            <label for="venn-alk-palmitic">Alk-Palmitic</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="venn-alk-palmitic-scdi" value="Alk_Palmitic_SCDi" checked>
+                            <label for="venn-alk-palmitic-scdi">Alk-Palmitic + SCDi</label>
+                        </div>
+                    </div>
+
+                    <h3>Differential Expression Thresholds</h3>
+                    <div class="threshold-controls">
+                        <div class="threshold-item">
+                            <label for="pvalue-threshold">P-value <</label>
+                            <input type="number" id="pvalue-threshold" value="0.05" step="0.01" min="0" max="1">
+                        </div>
+                        <div class="threshold-item">
+                            <label for="fc-threshold">Fold Change</label>
+                            <select id="fc-threshold">
+                                <option value="1.2">1.2x</option>
+                                <option value="1.5" selected>1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                        <div class="threshold-item">
+                            <label for="direction">Direction</label>
+                            <select id="direction">
+                                <option value="both" selected>Up & Down</option>
+                                <option value="up">Up only</option>
+                                <option value="down">Down only</option>
+                            </select>
+                        </div>
+                        <button class="update-venn-btn" onclick="updateVennDiagram()">Update Diagram</button>
+                    </div>
+                </div>
+
+                <div id="venn-diagram"></div>
+
+                <div class="venn-stats" id="venn-stats-section" style="display: none;">
+                    <h3>Differentially Expressed Proteins</h3>
+                    <div class="venn-stats-grid" id="venn-stats-grid"></div>
+
+                    <div class="venn-explanation">
+                        <h4>📊 Understanding the Results</h4>
+
+                        <div class="venn-explanation-section">
+                            <h5>Total DEPs per Condition:</h5>
+                            <p>These numbers represent the total proteins significantly changed compared to DMSO control (p < threshold AND fold change ≥ threshold):</p>
+                            <ul>
+                                <li><strong>Alk-Palmitoleic:</strong> Total proteins significantly affected by alkyne-palmitoleic acid treatment</li>
+                                <li><strong>Alk-Palmitic:</strong> Total proteins significantly affected by alkyne-palmitic acid treatment</li>
+                                <li><strong>Alk-Palmitic + SCDi:</strong> Total proteins significantly affected by alkyne-palmitic acid combined with SCD inhibitor</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <h5>Unique DEPs ("Only" categories):</h5>
+                            <p>These numbers represent proteins affected exclusively by one condition and NOT by the others:</p>
+                            <ul>
+                                <li><strong>Condition only:</strong> Proteins changed by that specific condition but NOT by any other selected condition</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <h5>Biological Interpretation:</h5>
+                            <ul>
+                                <li><strong>Alkyne-fatty acid tracking:</strong> Proteins enriched with alkyne-labeled fatty acids represent proteins incorporating or interacting with those specific fatty acids</li>
+                                <li><strong>Palmitoleic vs Palmitic:</strong> Compare unsaturated (16:1) vs saturated (16:0) palmitate incorporation patterns</li>
+                                <li><strong>SCD inhibition effect:</strong> Comparing Alk-Palmitic vs Alk-Palmitic+SCDi reveals how blocking SCD alters palmitic acid incorporation/metabolism</li>
+                                <li><strong>Unique responses:</strong> Proteins unique to each condition indicate distinct cellular adaptations to each treatment</li>
+                                <li><strong>Shared responses:</strong> Proteins common across conditions represent core fatty acid-responsive proteins</li>
+                            </ul>
+                        </div>
+
+                        <div class="venn-explanation-section">
+                            <p style="font-style: italic; color: #999;">💡 Tip: Click on any region of the Venn diagram to see the specific proteins in that category!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="gene-list-modal" id="geneListModal">
+        <div class="gene-list-content">
+            <div class="gene-list-header">
+                <h3 id="modalTitle">Proteins</h3>
+                <button class="close-modal-btn" onclick="closeGeneListModal()">×</button>
+            </div>
+            <div class="gene-list-body">
+                <div class="gene-list-info">
+                    <span class="gene-list-info-text" id="geneCount">0 proteins</span>
+                    <button class="download-genes-btn" onclick="downloadGeneList()">📥 Download</button>
+                </div>
+                <div class="gene-grid" id="geneGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let proteinData = {};
+        let allProteins = [];
+        let myChart = null;
+        let degSets = {};
+
+        const colors = {
+            'DMSO': '#6c757d',
+            'Alk_Palmitoleic': '#56B4E9',
+            'Alk_Palmitic': '#E69F00',
+            'Alk_Palmitic_SCDi': '#0072B2'
+        };
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // Initialize Venn diagram on first view
+            if (tabName === 'venn-diagram' && !window.vennInitialized) {
+                updateVennDiagram();
+                window.vennInitialized = true;
+            }
+        }
+
+        function getSignificance(pValue) {
+            if (pValue < 0.001) return '***';
+            if (pValue < 0.01) return '**';
+            if (pValue < 0.05) return '*';
+            return 'ns';
+        }
+
+        function plotProtein(proteinName) {
+            if (!proteinData[proteinName]) {
+                alert('Protein not found: ' + proteinName);
+                return;
+            }
+
+            const data = proteinData[proteinName];
+
+            // Show chart section, hide instruction
+            document.getElementById('instruction').style.display = 'none';
+            document.getElementById('chartSection').style.display = 'block';
+
+            // Set protein name
+            document.getElementById('proteinName').textContent = proteinName;
+
+            const treatments = ['DMSO', 'Alk_Palmitoleic', 'Alk_Palmitic', 'Alk_Palmitic_SCDi'];
+            const treatmentLabels = {
+                'DMSO': 'DMSO',
+                'Alk_Palmitoleic': 'Alk-Palmitoleic',
+                'Alk_Palmitic': 'Alk-Palmitic',
+                'Alk_Palmitic_SCDi': 'Alk-Palmitic + SCDi'
+            };
+            const labels = treatments.map(t => treatmentLabels[t]);
+            const means = treatments.map(t => data[t].mean);
+            const sems = treatments.map(t => data[t].sem);
+            const pValues = treatments.map(t => data[t].pValue);
+
+            // Calculate p-values using t-test (for treatments vs DMSO)
+            const dmsoValues = data['DMSO'].values;
+            const calculatedPValues = {};
+            treatments.forEach(treatment => {
+                if (treatment === 'DMSO') {
+                    calculatedPValues[treatment] = 1.0;
+                } else {
+                    calculatedPValues[treatment] = tTest(data[treatment].values, dmsoValues);
+                }
+            });
+
+            // Display stats panel
+            const statsHTML = treatments.map(treatment => {
+                const stats = data[treatment];
+                let pValueHTML = '';
+
+                if (treatment !== 'DMSO') {
+                    const p = calculatedPValues[treatment];
+                    const sig = getSignificance(p);
+                    const pDisplay = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
+                    pValueHTML = `<div class="stat-sem" style="color: ${p < 0.05 ? '#c33' : '#999'}; font-weight: ${p < 0.05 ? 'bold' : 'normal'}">${pDisplay} ${sig}</div>`;
+                }
+
+                return `
+                    <div class="stat-card" style="border-left-color: ${colors[treatment]}">
+                        <div class="stat-label">${treatmentLabels[treatment]}</div>
+                        <div class="stat-value">${stats.mean.toFixed(3)}</div>
+                        <div class="stat-sem">± ${stats.sem.toFixed(3)} SEM</div>
+                        ${pValueHTML}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('proteinStats').innerHTML = statsHTML;
+
+            // Destroy previous chart
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const ctx = document.getElementById('proteinChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: proteinName + ' Abundance (Normalized to DMSO)',
+                        data: means,
+                        backgroundColor: treatments.map(t => colors[t]),
+                        borderColor: treatments.map(t => colors[t]),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: proteinName,
+                            font: {
+                                size: 20,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const treatment = treatments[idx];
+                                    const mean = means[idx].toFixed(3);
+                                    const sem = sems[idx].toFixed(3);
+                                    const p = calculatedPValues[treatment];
+                                    const pStr = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
+                                    return [
+                                        `Mean: ${mean}`,
+                                        `SEM: ±${sem}`,
+                                        pStr
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Relative Abundance (Normalized to DMSO)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Treatment',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'errorBars',
+                    afterDatasetsDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, datasetIndex) => {
+                            const meta = chart.getDatasetMeta(datasetIndex);
+                            meta.data.forEach((bar, index) => {
+                                const mean = means[index];
+                                const sem = sems[index];
+                                const x = bar.x;
+                                const yTop = chart.scales.y.getPixelForValue(mean + sem);
+                                const yBottom = chart.scales.y.getPixelForValue(mean - sem);
+                                const yMean = bar.y;
+
+                                ctx.save();
+                                ctx.strokeStyle = '#000';
+                                ctx.lineWidth = 2;
+
+                                // Vertical line
+                                ctx.beginPath();
+                                ctx.moveTo(x, yTop);
+                                ctx.lineTo(x, yBottom);
+                                ctx.stroke();
+
+                                // Top cap
+                                ctx.beginPath();
+                                ctx.moveTo(x - 5, yTop);
+                                ctx.lineTo(x + 5, yTop);
+                                ctx.stroke();
+
+                                // Bottom cap
+                                ctx.beginPath();
+                                ctx.moveTo(x - 5, yBottom);
+                                ctx.lineTo(x + 5, yBottom);
+                                ctx.stroke();
+
+                                ctx.restore();
+                            });
+                        });
+                    }
+                }, {
+                    id: 'pValueAnnotations',
+                    afterDatasetsDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        const meta = chart.getDatasetMeta(0);
+
+                        meta.data.forEach((bar, index) => {
+                            if (index === 0) return; // Skip DMSO
+
+                            const treatment = treatments[index];
+                            const p = calculatedPValues[treatment];
+                            let stars = getSignificance(p);
+
+                            const x = bar.x;
+                            const y = bar.y - 20;
+
+                            ctx.save();
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillStyle = '#000';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(stars, x, y);
+                            ctx.restore();
+                        });
+                    }
+                }]
+            });
+        }
+
+        // Welch's t-test
+        function tTest(arr1, arr2) {
+            // Check for empty or insufficient data
+            if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) {
+                return 1.0;  // Return non-significant if no data
+            }
+            if (arr1.length < 2 || arr2.length < 2) {
+                return 1.0;  // Need at least 2 samples for t-test
+            }
+
+            const n1 = arr1.length;
+            const n2 = arr2.length;
+            const mean1 = arr1.reduce((a, b) => a + b, 0) / n1;
+            const mean2 = arr2.reduce((a, b) => a + b, 0) / n2;
+            const var1 = arr1.reduce((sum, val) => sum + Math.pow(val - mean1, 2), 0) / (n1 - 1);
+            const var2 = arr2.reduce((sum, val) => sum + Math.pow(val - mean2, 2), 0) / (n2 - 1);
+
+            // Check for zero variance
+            if (var1 === 0 && var2 === 0) {
+                return 1.0;  // No variance, cannot compute t-test
+            }
+
+            const tStat = (mean1 - mean2) / Math.sqrt(var1 / n1 + var2 / n2);
+
+            // Check for NaN or Infinity
+            if (!isFinite(tStat)) {
+                return 1.0;
+            }
+
+            const df = Math.pow(var1 / n1 + var2 / n2, 2) / (Math.pow(var1 / n1, 2) / (n1 - 1) + Math.pow(var2 / n2, 2) / (n2 - 1));
+
+            // Simplified p-value approximation
+            const pValue = 2 * (1 - normalCDF(Math.abs(tStat)));
+            return pValue;
+        }
+
+        function normalCDF(x) {
+            const t = 1 / (1 + 0.2316419 * Math.abs(x));
+            const d = 0.3989423 * Math.exp(-x * x / 2);
+            const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+            return x > 0 ? 1 - p : p;
+        }
+
+        function calculateDEGs() {
+            const pThreshold = parseFloat(document.getElementById('pvalue-threshold').value) || 0.05;
+            const fcThreshold = parseFloat(document.getElementById('fc-threshold').value) || 1.5;
+            const direction = document.getElementById('direction').value;
+
+            degSets = {
+                'Alk_Palmitoleic': new Set(),
+                'Alk_Palmitic': new Set(),
+                'Alk_Palmitic_SCDi': new Set()
+            };
+
+            Object.keys(proteinData).forEach(protein => {
+                const data = proteinData[protein];
+                const dmsoValues = data['DMSO'].values;
+
+                ['Alk_Palmitoleic', 'Alk_Palmitic', 'Alk_Palmitic_SCDi'].forEach(treatment => {
+                    const treatmentValues = data[treatment].values;
+                    const pValue = tTest(treatmentValues, dmsoValues);
+                    const meanTreatment = data[treatment].mean;
+                    const meanDmso = data['DMSO'].mean;
+                    const foldChange = meanTreatment / meanDmso;
+
+                    let isDEG = false;
+                    if (pValue < pThreshold) {
+                        if (direction === 'both') {
+                            isDEG = (foldChange >= fcThreshold || foldChange <= 1/fcThreshold);
+                        } else if (direction === 'up') {
+                            isDEG = (foldChange >= fcThreshold);
+                        } else if (direction === 'down') {
+                            isDEG = (foldChange <= 1/fcThreshold);
+                        }
+                    }
+
+                    if (isDEG) {
+                        degSets[treatment].add(protein);
+                    }
+                });
+            });
+        }
+
+        function prepareVennData(selectedConditions) {
+            if (selectedConditions.length === 0) return [];
+
+            const sets = selectedConditions.map(cond => ({
+                sets: [cond],
+                size: degSets[cond].size
+            }));
+
+            // 2-way overlaps
+            if (selectedConditions.length >= 2) {
+                for (let i = 0; i < selectedConditions.length; i++) {
+                    for (let j = i + 1; j < selectedConditions.length; j++) {
+                        const overlap = new Set([...degSets[selectedConditions[i]]].filter(x => degSets[selectedConditions[j]].has(x)));
+                        sets.push({
+                            sets: [selectedConditions[i], selectedConditions[j]],
+                            size: overlap.size
+                        });
+                    }
+                }
+            }
+
+            // 3-way overlap
+            if (selectedConditions.length === 3) {
+                const overlap3 = new Set([...degSets[selectedConditions[0]]].filter(x =>
+                    degSets[selectedConditions[1]].has(x) && degSets[selectedConditions[2]].has(x)
+                ));
+                sets.push({
+                    sets: selectedConditions,
+                    size: overlap3.size
+                });
+            }
+
+            return sets;
+        }
+
+        function updateVennDiagram() {
+            // Check if data is loaded
+            if (!proteinData || Object.keys(proteinData).length === 0) {
+                document.getElementById('venn-diagram').innerHTML = '<p style="text-align: center; color: #6c757d; padding: 50px;">⏳ Loading protein data...</p>';
+                setTimeout(updateVennDiagram, 500);  // Retry after 500ms
+                return;
+            }
+
+            calculateDEGs();
+
+            const selectedConditions = [];
+            if (document.getElementById('venn-alk-palmitoleic').checked) selectedConditions.push('Alk_Palmitoleic');
+            if (document.getElementById('venn-alk-palmitic').checked) selectedConditions.push('Alk_Palmitic');
+            if (document.getElementById('venn-alk-palmitic-scdi').checked) selectedConditions.push('Alk_Palmitic_SCDi');
+
+            if (selectedConditions.length === 0) {
+                document.getElementById('venn-diagram').innerHTML = '<p style="text-align: center; color: #6c757d; padding: 50px;">Please select at least one condition to display.</p>';
+                document.getElementById('venn-stats-section').style.display = 'none';
+                return;
+            }
+
+            const vennData = prepareVennData(selectedConditions);
+
+            console.log('Venn data:', vennData);  // Debug
+
+            document.getElementById('venn-diagram').innerHTML = '';
+
+            try {
+                const chart = venn.VennDiagram()
+                    .width(800)
+                    .height(500);
+
+                const div = d3.select("#venn-diagram").datum(vennData).call(chart);
+
+            div.selectAll("text").style("fill", "white").style("font-weight", "600");
+            div.selectAll(".venn-circle path")
+                .style("fill-opacity", 0.3)
+                .style("stroke-width", 2);
+
+            div.selectAll(".venn-circle").each(function(d, i) {
+                const colorMap = {
+                    'Alk_Palmitoleic': '#56B4E9',
+                    'Alk_Palmitic': '#E69F00',
+                    'Alk_Palmitic_SCDi': '#0072B2'
+                };
+                d3.select(this).select("path")
+                    .style("fill", colorMap[d.sets[0]] || '#11998e')
+                    .style("stroke", colorMap[d.sets[0]] || '#11998e');
+            });
+
+            div.selectAll("g")
+                .style("cursor", "pointer")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).select("path").style("fill-opacity", 0.5);
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this).select("path").style("fill-opacity", 0.3);
+                })
+                .on("click", function(event, d) {
+                    event.stopPropagation();
+                    showGenesForRegion(d.sets);
+                });
+
+                updateVennStats(selectedConditions);
+            } catch (error) {
+                console.error('Venn diagram error:', error);
+                document.getElementById('venn-diagram').innerHTML =
+                    `<p style="text-align: center; color: #c33; padding: 50px;">
+                        ❌ Error rendering Venn diagram: ${error.message}<br>
+                        <small>Check browser console for details</small>
+                    </p>`;
+            }
+        }
+
+        function updateVennStats(selectedConditions) {
+            const statsGrid = document.getElementById('venn-stats-grid');
+            statsGrid.innerHTML = '';
+
+            const conditionLabels = {
+                'Alk_Palmitoleic': 'Alk-Palmitoleic',
+                'Alk_Palmitic': 'Alk-Palmitic',
+                'Alk_Palmitic_SCDi': 'Alk-Palmitic + SCDi'
+            };
+
+            selectedConditions.forEach(condition => {
+                const card = document.createElement('div');
+                card.className = 'venn-stat-card';
+                card.innerHTML = `
+                    <h4>${conditionLabels[condition]}</h4>
+                    <div class="count">${degSets[condition].size}</div>
+                `;
+                statsGrid.appendChild(card);
+            });
+
+            if (selectedConditions.length >= 2) {
+                selectedConditions.forEach(condition => {
+                    const uniqueGenes = new Set([...degSets[condition]]);
+                    selectedConditions.forEach(otherCondition => {
+                        if (condition !== otherCondition) {
+                            [...degSets[otherCondition]].forEach(gene => uniqueGenes.delete(gene));
+                        }
+                    });
+
+                    const card = document.createElement('div');
+                    card.className = 'venn-stat-card';
+                    card.style.borderLeftColor = colors[condition];
+                    card.innerHTML = `
+                        <h4>${conditionLabels[condition]} only</h4>
+                        <div class="count">${uniqueGenes.size}</div>
+                    `;
+                    statsGrid.appendChild(card);
+                });
+            }
+
+            document.getElementById('venn-stats-section').style.display = 'block';
+        }
+
+        function showGenesForRegion(sets) {
+            const conditionLabels = {
+                'Alk_Palmitoleic': 'Alk-Palmitoleic',
+                'Alk_Palmitic': 'Alk-Palmitic',
+                'Alk_Palmitic_SCDi': 'Alk-Palmitic + SCDi'
+            };
+
+            let genes;
+            if (sets.length === 1) {
+                genes = Array.from(degSets[sets[0]]);
+            } else if (sets.length === 2) {
+                genes = Array.from(degSets[sets[0]]).filter(g => degSets[sets[1]].has(g));
+            } else if (sets.length === 3) {
+                genes = Array.from(degSets[sets[0]]).filter(g =>
+                    degSets[sets[1]].has(g) && degSets[sets[2]].has(g)
+                );
+            }
+
+            genes.sort();
+
+            const setNames = sets.map(s => conditionLabels[s]);
+            document.getElementById('modalTitle').textContent =
+                sets.length === 1 ? `${setNames[0]} DEPs` : `${setNames.join(' ∩ ')} Overlap`;
+            document.getElementById('geneCount').textContent = `${genes.length} proteins`;
+
+            const geneGrid = document.getElementById('geneGrid');
+            geneGrid.innerHTML = genes.map(gene =>
+                `<div class="gene-item" onclick="viewGeneInViewer('${gene}')">${gene}</div>`
+            ).join('');
+
+            window.currentGeneList = genes;
+            window.currentRegionName = sets.join('_');
+
+            document.getElementById('geneListModal').classList.add('active');
+        }
+
+        function closeGeneListModal() {
+            document.getElementById('geneListModal').classList.remove('active');
+        }
+
+        function downloadGeneList() {
+            if (!window.currentGeneList || window.currentGeneList.length === 0) return;
+
+            const content = window.currentGeneList.join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `DEPs_${window.currentRegionName}_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function viewGeneInViewer(geneName) {
+            closeGeneListModal();
+            switchTab('protein-viewer');
+            document.getElementById('proteinSearch').value = geneName;
+            plotProtein(geneName);
+        }
+
+        // Load data
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('instruction').style.display = 'none';
+
+        fetch('protein_data_optimized.json')
+            .then(response => response.json())
+            .then(data => {
+                proteinData = data;
+                allProteins = Object.keys(data).sort();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('instruction').style.display = 'block';
+
+                console.log(`✅ Loaded ${allProteins.length} proteins instantly!`);
+            })
+            .catch(error => {
+                document.getElementById('loading').innerHTML =
+                    '<div style="color: #c33; padding: 20px;">Error loading data: ' + error.message + '</div>';
+            });
+
+        // Search functionality
+        const searchInput = document.getElementById('proteinSearch');
+        const suggestionsDiv = document.getElementById('suggestions');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toUpperCase();
+
+            if (query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            const matches = allProteins
+                .filter(protein => protein.toUpperCase().includes(query))
+                .slice(0, 20);
+
+            if (matches.length > 0) {
+                suggestionsDiv.innerHTML = matches.map(protein => {
+                    const idx = protein.toUpperCase().indexOf(query);
+                    const before = protein.substring(0, idx);
+                    const match = protein.substring(idx, idx + query.length);
+                    const after = protein.substring(idx + query.length);
+
+                    return `<div class="suggestion-item" data-protein="${protein}">
+                        ${before}<span class="suggestion-highlight">${match}</span>${after}
+                    </div>`;
+                }).join('');
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        suggestionsDiv.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item') || e.target.parentElement.classList.contains('suggestion-item')) {
+                const item = e.target.classList.contains('suggestion-item') ? e.target : e.target.parentElement;
+                const protein = item.dataset.protein;
+                searchInput.value = protein;
+                suggestionsDiv.style.display = 'none';
+                plotProtein(protein);
+            }
+        });
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const protein = this.value.trim();
+                suggestionsDiv.style.display = 'none';
+                plotProtein(protein);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
