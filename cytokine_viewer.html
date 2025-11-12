@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cytokine Secretion Analysis - Interactive Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            padding-right: 240px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .back-button:hover {
+            background: rgba(255,255,255,0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+        }
+
+        .search-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        #cytokineSearch {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        #cytokineSearch:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .suggestion-item:hover {
+            background: #f8f9ff;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .chart-section {
+            display: none;
+            padding: 40px;
+            background: white;
+        }
+
+        .cytokine-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .cytokine-info h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .stat-sem {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-top: 30px;
+        }
+
+        #instruction {
+            text-align: center;
+            padding: 80px 20px;
+            color: #999;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 60px 20px 30px 20px;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .back-button {
+                top: 15px;
+                right: 15px;
+                padding: 8px 16px;
+                font-size: 0.85em;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-button">← Back to home page</a>
+            <h1>🧪 Cytokine Secretion Analysis - Interactive Visualization</h1>
+            <p>Explore secreted cytokine and growth factor changes in response to SCD inhibition ± fatty acid supplementation</p>
+            <span class="badge">📊 37 cytokines/growth factors measured by ELISA multiplex</span>
+            <div style="margin-top: 15px; font-size: 0.95em; opacity: 0.95; line-height: 1.6;">
+                <p><strong>Experimental Design:</strong> PDX59 cells treated with SCD inhibitor (CAY10566) alone or combined with oleic acid (OA) or palmitoleic acid (PO), followed by media collection and multiplex cytokine analysis</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="search-section">
+                <h2>Search for a Cytokine</h2>
+                <div class="search-container">
+                    <input type="text" id="cytokineSearch" placeholder="Type a cytokine name (e.g., IL-6, IL-8, VEGF-A)..." autocomplete="off">
+                    <div id="suggestions"></div>
+                </div>
+            </div>
+
+            <div id="chartSection" class="chart-section">
+                <div class="cytokine-info">
+                    <h2 id="cytokineName"></h2>
+                    <div id="cytokineStats" class="stats-grid"></div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cytokineChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div id="instruction">
+                    👆 Search for a cytokine above to visualize secretion changes
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cytokineData = {};
+        let allCytokines = [];
+        let myChart = null;
+
+        const colors = {
+            'Control': '#6c757d',
+            'SCDi': '#e74c3c',
+            'SCDi+OA': '#3498db',
+            'SCDi+PO': '#2ecc71'
+        };
+
+        function getSignificance(pValue) {
+            if (pValue < 0.001) return '***';
+            if (pValue < 0.01) return '**';
+            if (pValue < 0.05) return '*';
+            return 'ns';
+        }
+
+        function plotCytokine(cytokineName) {
+            if (!cytokineData[cytokineName]) {
+                alert('Cytokine not found: ' + cytokineName);
+                return;
+            }
+
+            const data = cytokineData[cytokineName];
+
+            // Show chart section, hide instruction
+            document.getElementById('instruction').style.display = 'none';
+            document.getElementById('chartSection').style.display = 'block';
+
+            // Set cytokine name
+            document.getElementById('cytokineName').textContent = cytokineName;
+
+            const treatments = ['Control', 'SCDi', 'SCDi+OA', 'SCDi+PO'];
+            const treatmentLabels = {
+                'Control': 'Control',
+                'SCDi': 'SCDi',
+                'SCDi+OA': 'SCDi + OA',
+                'SCDi+PO': 'SCDi + PO'
+            };
+            const labels = treatments.map(t => treatmentLabels[t]);
+            const means = treatments.map(t => data[t].mean);
+            const sems = treatments.map(t => data[t].sem);
+            const pValues = treatments.map(t => data[t].pValue);
+
+            // Display stats panel
+            const statsHTML = treatments.map(treatment => {
+                const stats = data[treatment];
+                let pValueHTML = '';
+
+                if (treatment !== 'Control') {
+                    const p = stats.pValue;
+                    const sig = getSignificance(p);
+                    const pDisplay = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
+                    pValueHTML = `<div class="stat-sem" style="color: ${p < 0.05 ? '#c33' : '#999'}; font-weight: ${p < 0.05 ? 'bold' : 'normal'}">${pDisplay} ${sig}</div>`;
+                }
+
+                return `
+                    <div class="stat-card" style="border-left-color: ${colors[treatment]}">
+                        <div class="stat-label">${treatmentLabels[treatment]}</div>
+                        <div class="stat-value">${stats.mean.toFixed(2)} pg/mL</div>
+                        <div class="stat-sem">± ${stats.sem.toFixed(2)} SEM</div>
+                        ${pValueHTML}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('cytokineStats').innerHTML = statsHTML;
+
+            // Destroy previous chart
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const ctx = document.getElementById('cytokineChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Secreted Cytokine (pg/mL)',
+                        data: means,
+                        backgroundColor: treatments.map(t => colors[t]),
+                        borderColor: treatments.map(t => colors[t]),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: cytokineName + ' Secretion',
+                            font: { size: 18, weight: 'bold' },
+                            padding: 20
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const treatment = treatments[idx];
+                                    const mean = means[idx].toFixed(2);
+                                    const sem = sems[idx].toFixed(2);
+                                    const p = pValues[idx];
+                                    const pStr = p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`;
+                                    return [
+                                        `Mean: ${mean} pg/mL`,
+                                        `SEM: ±${sem}`,
+                                        pStr
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Concentration (pg/mL)',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Treatment',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'pValueAnnotations',
+                    afterDatasetsDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        const meta = chart.getDatasetMeta(0);
+
+                        meta.data.forEach((bar, index) => {
+                            if (index === 0) return; // Skip Control
+
+                            const treatment = treatments[index];
+                            const p = pValues[index];
+                            let stars = getSignificance(p);
+
+                            const x = bar.x;
+                            const y = bar.y - 20;
+
+                            ctx.save();
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillStyle = '#000';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(stars, x, y);
+                            ctx.restore();
+                        });
+                    }
+                }]
+            });
+        }
+
+        // Autocomplete functionality
+        const searchInput = document.getElementById('cytokineSearch');
+        const suggestionsDiv = document.getElementById('suggestions');
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+
+            if (searchTerm.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            const matches = allCytokines.filter(cytokine =>
+                cytokine.toLowerCase().includes(searchTerm)
+            );
+
+            if (matches.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            suggestionsDiv.innerHTML = matches.map(cytokine =>
+                `<div class="suggestion-item" onclick="selectCytokine('${cytokine}')">${cytokine}</div>`
+            ).join('');
+
+            suggestionsDiv.style.display = 'block';
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const searchTerm = this.value;
+                const exactMatch = allCytokines.find(c => c.toLowerCase() === searchTerm.toLowerCase());
+                if (exactMatch) {
+                    selectCytokine(exactMatch);
+                } else {
+                    const firstMatch = allCytokines.find(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+                    if (firstMatch) {
+                        selectCytokine(firstMatch);
+                    }
+                }
+            }
+        });
+
+        function selectCytokine(cytokineName) {
+            searchInput.value = cytokineName;
+            suggestionsDiv.style.display = 'none';
+            plotCytokine(cytokineName);
+        }
+
+        // Close suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        // Load data
+        fetch('cytokine_data_optimized.json')
+            .then(response => response.json())
+            .then(data => {
+                cytokineData = data;
+                allCytokines = Object.keys(data).sort();
+                console.log('Loaded', allCytokines.length, 'cytokines');
+
+                // Auto-plot IL-6 as example
+                if (allCytokines.includes('IL-6 (pg/ML)')) {
+                    selectCytokine('IL-6 (pg/ML)');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading cytokine data:', error);
+                alert('Error loading data. Please refresh the page.');
+            });
+    </script>
+</body>
+</html>
